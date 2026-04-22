@@ -39,7 +39,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       margin: { top: "8mm", bottom: "8mm", left: "8mm", right: "8mm" },
     });
     await browser.close();
-    return new NextResponse(buffer, {
+    return new NextResponse(Buffer.from(buffer), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="uvikt-report-${report.id}.pdf"`,
