@@ -1,0 +1,428 @@
+// UVIKT — multi-tenant property intelligence platform
+// Prisma schema. Uses SQLite for zero-config dev; swap provider to "postgresql" for prod.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Auth + tenancy
+// ──────────────────────────────────────────────────────────────────
+
+model Organization {
+  id              String            @id @default(cuid())
+  name            String
+  slug            String            @unique
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Configurable demographic radii (meters). PDF brief mentions both 250/500 and 500/1000/5000.
+  // Stored as CSV to avoid a JSON column on SQLite; parsed in lib/tenant.ts.
+  demographicRadiiMeters String    @default("500,1000,5000")
+
+  brandingProfile BrandingProfile?
+  memberships     OrganizationMembership[]
+  properties      Property[]
+  reportTemplates ReportTemplate[]
+  auditLogs       AuditLog[]
+  sourceConfigs   AdminSourceConfig[]
+  marketSnapshots AggregateMarketSnapshot[]
+}
+
+model User {
+  id           String                   @id @default(cuid())
+  email        String                   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  memberships  OrganizationMembership[]
+  auditLogs    AuditLog[]
+}
+
+model OrganizationMembership {
+  id             String        @id @default(cuid())
+  userId         String
+  organizationId String
+  role           String        // 'admin' | 'broker' | 'investor'
+  createdAt      DateTime      @default(now())
+
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+model BrandingProfile {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  logoUrl        String?
+  primaryColor   String       @default("#0E2A35")
+  accentColor    String       @default("#E4B43C")
+  companyName    String?
+  contactEmail   String?
+  contactPhone   String?
+  footerNote     String?
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Property core
+// ──────────────────────────────────────────────────────────────────
+
+model Property {
+  id             String   @id @default(cuid())
+  organizationId String
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Ingestion
+  inputMethod    String   // 'mobile_photo' | 'desktop_address'
+  status         String   @default("draft") // 'draft' | 'validated' | 'enriched' | 'report_ready' | 'archived'
+  transactionType String  @default("sale")  // 'sale' | 'rent'
+
+  // Commercial snapshot
+  title          String?
+  description    String?
+  priceAmount    Float?
+  priceCurrency  String?  @default("MXN")
+
+  // Physical attributes (broker-entered)
+  surfaceM2      Float?
+  frontageM      Float?
+  depthM         Float?
+  propertyUse    String?  // 'comercio' | 'habitacional' | 'industrial' | 'mixto' | 'otro'
+  isCorner       Boolean  @default(false)
+  levels         Int?
+  localUnits     Int?
+  notableBrands  String?  // free text: "Starbucks, BBVA, Oxxo"
+
+  // Enrichment summary
+  landUse        String?  // e.g. "HC/3/20" — normalized SEDUVI code
+  polygonGeoJson String?  // stringified GeoJSON polygon
+  seduviFichaUrl String?  // PDF link
+  kmzUrl         String?  // generated KMZ
+
+  // Access / audit
+  reportReadyAt  DateTime?
+
+  // Relations
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inputs         PropertyInput[]
+  addresses      PropertyAddress[]
+  locations      PropertyLocation[]
+  media          PropertyMedia[]
+  sourceRecords  PropertySourceRecord[]
+  enrichmentJobs PropertyEnrichmentJob[]
+  demographics   PropertyDemographics[]
+  commercialCtx  PropertyCommercialContext[]
+  documents      PropertyDocument[]
+  reports        GeneratedReport[]
+  pipelineEntry  InvestorPipelineEntry?
+  notes          PropertyNote[]
+  tags           PropertyTag[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, transactionType])
+  @@index([organizationId, createdAt])
+  @@index([landUse])
+}
+
+// Raw ingestion payload (photo upload payload / typed-address payload)
+model PropertyInput {
+  id          String   @id @default(cuid())
+  propertyId  String
+  method      String   // 'mobile_photo' | 'desktop_address'
+  rawPayload  String   // JSON stringified: exif coords, typed address, user agent
+  createdAt   DateTime @default(now())
+
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+}
+
+// Source of truth for addresses — normalized + validated
+model PropertyAddress {
+  id              String   @id @default(cuid())
+  propertyId      String
+  source          String   // 'user' | 'sepomex' | 'nominatim' | 'manual_override'
+  isPrimary       Boolean  @default(false)
+  line1           String
+  line2           String?
+  neighborhood    String?
+  municipality    String?
+  state           String?
+  postalCode      String?
+  country         String   @default("MX")
+  validated       Boolean  @default(false)
+  validatedAt     DateTime?
+  confidence      Float?
+  createdAt       DateTime @default(now())
+
+  property        Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, isPrimary])
+  @@index([postalCode])
+}
+
+// Coordinates — both immutable original (from geophoto) and any user-corrected pin
+model PropertyLocation {
+  id             String   @id @default(cuid())
+  propertyId     String
+  kind           String   // 'original' | 'corrected' | 'geocoded'
+  lat            Float
+  lng            Float
+  accuracyMeters Float?
+  source         String   // 'exif' | 'user_pin' | 'nominatim' | 'sepomex' | 'seduvi'
+  createdAt      DateTime @default(now())
+
+  property       Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, kind])
+  @@index([lat, lng])
+}
+
+model PropertyMedia {
+  id            String   @id @default(cuid())
+  propertyId    String
+  kind          String   // 'hero' | 'photo' | 'map' | 'floorplan'
+  url           String
+  storageKey    String
+  mimeType      String?
+  widthPx       Int?
+  heightPx      Int?
+  exifLat       Float?
+  exifLng       Float?
+  takenAt       DateTime?
+  uploadedById  String?
+  createdAt     DateTime @default(now())
+
+  property      Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, kind])
+}
+
+// Raw + normalized payloads from each external connector run
+model PropertySourceRecord {
+  id             String   @id @default(cuid())
+  propertyId     String
+  source         String   // 'sepomex' | 'seduvi' | 'inegi' | 'commercial'
+  status         String   // 'success' | 'partial' | 'failed'
+  confidence     Float?
+  rawPayload     String?  // JSON
+  normalizedPayload String? // JSON
+  errorMessage   String?
+  fetchedAt      DateTime @default(now())
+
+  property       Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, source])
+}
+
+model PropertyEnrichmentJob {
+  id             String   @id @default(cuid())
+  propertyId     String
+  source         String   // 'sepomex' | 'seduvi' | 'inegi' | 'commercial' | 'all'
+  status         String   // 'pending' | 'running' | 'success' | 'partial' | 'failed' | 'manual_review'
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  attempt        Int      @default(0)
+  lastError      String?
+  scheduledAt    DateTime @default(now())
+
+  property       Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, source])
+  @@index([status, scheduledAt])
+}
+
+model PropertyDemographics {
+  id              String   @id @default(cuid())
+  propertyId      String
+  radiusMeters    Int
+  population      Int?
+  households      Int?
+  avgAge          Float?
+  avgHouseholdIncome Float?
+  socioeconomicAbc1Pct Float?
+  socioeconomicC2Pct   Float?
+  socioeconomicCPct    Float?
+  socioeconomicDPct    Float?
+  socioeconomicEPct    Float?
+  payloadJson     String?  // full INEGI payload for later analytics
+  fetchedAt       DateTime @default(now())
+
+  property        Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, radiusMeters])
+}
+
+model PropertyCommercialContext {
+  id            String   @id @default(cuid())
+  propertyId    String
+  radiusMeters  Int
+  category      String   // 'retail' | 'banking' | 'food' | 'automotive' | 'education' | 'healthcare'
+  count         Int      @default(0)
+  notableBrands String?  // CSV of brand names within radius
+  payloadJson   String?
+  fetchedAt     DateTime @default(now())
+
+  property      Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, radiusMeters, category])
+}
+
+model PropertyDocument {
+  id            String   @id @default(cuid())
+  propertyId    String
+  kind          String   // 'seduvi_ficha' | 'kmz' | 'contract' | 'other'
+  url           String
+  storageKey    String?
+  label         String?
+  createdAt     DateTime @default(now())
+
+  property      Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, kind])
+}
+
+model PropertyNote {
+  id          String   @id @default(cuid())
+  propertyId  String
+  authorId    String?
+  body        String
+  createdAt   DateTime @default(now())
+
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, createdAt])
+}
+
+model PropertyTag {
+  id          String   @id @default(cuid())
+  propertyId  String
+  label       String
+  color       String?  @default("#64748b")
+
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, label])
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Reports
+// ──────────────────────────────────────────────────────────────────
+
+model ReportTemplate {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String
+  isDefault       Boolean  @default(false)
+  configJson      String   // section toggles, color overrides
+  createdAt       DateTime @default(now())
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model GeneratedReport {
+  id             String   @id @default(cuid())
+  propertyId     String
+  templateId     String?
+  version        Int      @default(1)
+  shareToken     String   @unique
+  shareExpiresAt DateTime?
+  pdfUrl         String?
+  publicAllowed  Boolean  @default(true)
+  snapshotJson   String   // frozen data used to render the report
+  viewsCount     Int      @default(0)
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  property       Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Investor pipeline (Phase 2 scaffolding, but tables live)
+// ──────────────────────────────────────────────────────────────────
+
+model InvestorPipelineEntry {
+  id             String   @id @default(cuid())
+  propertyId     String   @unique
+  stage          String   @default("prospect") // 'prospect' | 'reviewing' | 'negotiating' | 'closed' | 'archived'
+  owner          String?  // user id
+  estimatedValue Float?
+  rtzRadiusMeters Int?    @default(1000) // "área de influencia" from brief
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  property       Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([stage])
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Admin / ops
+// ──────────────────────────────────────────────────────────────────
+
+model AdminSourceConfig {
+  id             String   @id @default(cuid())
+  organizationId String
+  source         String   // 'sepomex' | 'seduvi' | 'inegi' | 'commercial'
+  enabled        Boolean  @default(true)
+  apiUrl         String?
+  apiKey         String?
+  lastHealthyAt  DateTime?
+  lastErrorAt    DateTime?
+  lastError      String?
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, source])
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  actorId        String?
+  action         String   // 'property.create' | 'property.update' | 'report.share' | ...
+  targetType     String?
+  targetId       String?
+  metadataJson   String?
+  ip             String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor          User?        @relation(fields: [actorId], references: [id])
+
+  @@index([organizationId, createdAt])
+}
+
+model AggregateMarketSnapshot {
+  id             String   @id @default(cuid())
+  organizationId String?  // null = global
+  scope          String   // 'global' | 'state' | 'municipality'
+  scopeKey       String?
+  periodStart    DateTime
+  periodEnd      DateTime
+  payloadJson    String   // aggregated metrics
+  createdAt      DateTime @default(now())
+
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([scope, periodStart])
+}
