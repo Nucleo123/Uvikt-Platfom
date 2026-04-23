@@ -87,9 +87,26 @@ model Property {
   updatedAt      DateTime @updatedAt
 
   // Ingestion
-  inputMethod    String   // 'mobile_photo' | 'desktop_address'
+  inputMethod    String   // 'mobile_photo' | 'desktop_address' | 'manual'
   status         String   @default("draft") // 'draft' | 'validated' | 'enriched' | 'report_ready' | 'archived'
-  transactionType String  @default("sale")  // 'sale' | 'rent'
+  transactionType String  @default("sale")  // 'sale' | 'rent' | 'acquisition'
+
+  // ——— Acquisition CRM (Etapa 1) ———
+  ticketNumber    String?  // e.g. "UVK-0001", auto-generated per org
+  acquisitionStage String @default("analyzing")
+  // stages: 'analyzing' | 'authorized' | 'canceled' | 'signing' | 'signed'
+
+  propertyType    String?  // 'terreno' | 'local' | 'bodega' | 'otro'
+
+  occupancyStatus String?  // 'rented' | 'vacant'
+  currentTenant   String?  // when rented: nombre del inquilino actual
+  currentRent     Float?   // when rented: renta mensual (MXN)
+  potentialTenant String?  // when vacant: marca/nombre potencial
+
+  responsableInternoId String?  // User.id dentro de la organización
+  responsableExternoName String? // broker externo — nombre libre
+  responsableExternoEmail String?
+  responsableExternoPhone String?
 
   // Commercial snapshot
   title          String?
@@ -135,7 +152,16 @@ model Property {
   @@index([organizationId, status])
   @@index([organizationId, transactionType])
   @@index([organizationId, createdAt])
+  @@index([organizationId, acquisitionStage])
+  @@index([organizationId, ticketNumber])
   @@index([landUse])
+}
+
+// Per-organization sequential counter for ticket numbers (UVK-0001, UVK-0002…)
+model OrganizationCounter {
+  organizationId String   @id
+  lastTicketNum  Int      @default(0)
+  updatedAt      DateTime @updatedAt
 }
 
 // Raw ingestion payload (photo upload payload / typed-address payload)

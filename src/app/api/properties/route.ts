@@ -6,8 +6,23 @@ import { assertCan } from "@/lib/rbac";
 import { createProperty } from "@/server/services/property";
 
 const createSchema = z.object({
-  inputMethod: z.enum(["mobile_photo", "desktop_address"]),
-  transactionType: z.enum(["sale", "rent"]).optional(),
+  inputMethod: z.enum(["mobile_photo", "desktop_address", "manual"]),
+  transactionType: z.enum(["sale", "rent", "acquisition"]).optional(),
+  // Acquisition CRM
+  acquisitionStage: z.enum(["analyzing", "authorized", "canceled", "signing", "signed"]).optional(),
+  propertyType: z.enum(["terreno", "local", "bodega", "otro"]).optional(),
+  occupancyStatus: z.enum(["rented", "vacant"]).optional(),
+  currentTenant: z.string().optional(),
+  currentRent: z.number().optional(),
+  potentialTenant: z.string().optional(),
+  responsableInternoId: z.string().optional(),
+  responsableExternoName: z.string().optional(),
+  responsableExternoEmail: z.string().email().optional(),
+  responsableExternoPhone: z.string().optional(),
+  seduviFichaUploadedUrl: z.string().url().optional(),
+  kmzUploadedUrl: z.string().url().optional(),
+  kmzPolygonGeoJson: z.string().optional(),
+
   title: z.string().optional(),
   description: z.string().optional(),
   priceAmount: z.number().optional(),

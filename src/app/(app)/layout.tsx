@@ -25,8 +25,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
         <nav className="flex flex-1 flex-col gap-1 text-sm">
           <NavLink href="/dashboard" label="Dashboard" />
-          <NavLink href="/properties" label="Propiedades" />
-          <NavLink href="/properties/new" label="Nueva propiedad" />
+          <NavLink href="/adquisiciones" label="Adquisiciones" />
+          <NavLink href="/properties" label="Inmuebles" />
+          <NavLink href="/properties/new" label="Nuevo inmueble" />
           {can(role, "pipeline.manage") && <NavLink href="/pipeline" label="Pipeline inversionista" />}
           <div className="mt-4 text-[10px] uppercase tracking-widest text-slate-400">Admin</div>
           {can(role, "admin.branding") && <NavLink href="/admin/branding" label="Branding" />}

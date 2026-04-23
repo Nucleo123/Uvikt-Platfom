@@ -1,12 +1,26 @@
 import { prisma } from "@/lib/db";
 import { logAudit } from "./audit";
 import { enqueue } from "@/server/jobs/queue";
+import { allocateTicketNumber } from "./ticket";
 
 export type CreatePropertyInput = {
   organizationId: string;
   createdById: string;
-  inputMethod: "mobile_photo" | "desktop_address";
-  transactionType?: "sale" | "rent";
+  inputMethod: "mobile_photo" | "desktop_address" | "manual";
+  transactionType?: "sale" | "rent" | "acquisition";
+
+  // Acquisition CRM fields (Etapa 1)
+  acquisitionStage?: "analyzing" | "authorized" | "canceled" | "signing" | "signed";
+  propertyType?: "terreno" | "local" | "bodega" | "otro";
+  occupancyStatus?: "rented" | "vacant";
+  currentTenant?: string;
+  currentRent?: number;
+  potentialTenant?: string;
+  responsableInternoId?: string;
+  responsableExternoName?: string;
+  responsableExternoEmail?: string;
+  responsableExternoPhone?: string;
+
   title?: string;
   description?: string;
   priceAmount?: number;
@@ -36,15 +50,34 @@ export type CreatePropertyInput = {
   };
   photoUrl?: string;
   photoStorageKey?: string;
+
+  // Pre-uploaded documents
+  seduviFichaUploadedUrl?: string;
+  kmzUploadedUrl?: string;
+  kmzPolygonGeoJson?: string;
 };
 
 export async function createProperty(input: CreatePropertyInput) {
+  const ticketNumber = await allocateTicketNumber(input.organizationId);
+
   const p = await prisma.property.create({
     data: {
       organizationId: input.organizationId,
       createdById: input.createdById,
       inputMethod: input.inputMethod,
-      transactionType: input.transactionType ?? "sale",
+      transactionType: input.transactionType ?? "acquisition",
+      ticketNumber,
+      acquisitionStage: input.acquisitionStage ?? "analyzing",
+      propertyType: input.propertyType,
+      occupancyStatus: input.occupancyStatus,
+      currentTenant: input.currentTenant,
+      currentRent: input.currentRent,
+      potentialTenant: input.potentialTenant,
+      responsableInternoId: input.responsableInternoId,
+      responsableExternoName: input.responsableExternoName,
+      responsableExternoEmail: input.responsableExternoEmail,
+      responsableExternoPhone: input.responsableExternoPhone,
+      polygonGeoJson: input.kmzPolygonGeoJson,
       title: input.title,
       description: input.description,
       priceAmount: input.priceAmount,
@@ -98,8 +131,18 @@ export async function createProperty(input: CreatePropertyInput) {
           rawPayload: JSON.stringify(input),
         },
       },
+      documents: {
+        create: [
+          ...(input.seduviFichaUploadedUrl
+            ? [{ kind: "seduvi_ficha_uploaded", url: input.seduviFichaUploadedUrl, label: "Ficha SEDUVI (cargada)" }]
+            : []),
+          ...(input.kmzUploadedUrl
+            ? [{ kind: "kmz_uploaded", url: input.kmzUploadedUrl, label: "KMZ (cargado)" }]
+            : []),
+        ],
+      },
     },
-    include: { addresses: true, locations: true, media: true },
+    include: { addresses: true, locations: true, media: true, documents: true },
   });
 
   await logAudit({
@@ -108,13 +151,34 @@ export async function createProperty(input: CreatePropertyInput) {
     action: "property.create",
     targetType: "property",
     targetId: p.id,
-    metadata: { inputMethod: input.inputMethod, transactionType: p.transactionType },
+    metadata: { ticketNumber, inputMethod: input.inputMethod, acquisitionStage: p.acquisitionStage },
   });
 
-  // Fire off enrichment right away
-  await enqueue("enrich_property", { propertyId: p.id });
+  // Only fire auto-enrichment for the original broker flow (sale/rent).
+  // Acquisition CRM flow is manual — brokers upload SEDUVI PDF + KMZ themselves.
+  if (input.transactionType !== "acquisition") {
+    await enqueue("enrich_property", { propertyId: p.id });
+  }
 
   return p;
+}
+
+export async function changeAcquisitionStage(
+  organizationId: string,
+  propertyId: string,
+  newStage: string,
+  actorId: string,
+) {
+  const current = await prisma.property.findUnique({ where: { id: propertyId }, select: { acquisitionStage: true } });
+  await prisma.property.update({
+    where: { id: propertyId },
+    data: { acquisitionStage: newStage },
+  });
+  await logAudit({
+    organizationId, actorId, action: "property.stage_change",
+    targetType: "property", targetId: propertyId,
+    metadata: { from: current?.acquisitionStage, to: newStage },
+  });
 }
 
 export async function correctPin(

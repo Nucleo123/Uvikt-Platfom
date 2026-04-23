@@ -59,12 +59,30 @@ async function main() {
     });
   }
 
-  // 3. Demo property from the presentation mock
+  // 3. Demo property from the presentation mock (idempotent)
   const existing = await prisma.property.findFirst({
     where: { organizationId: org.id, title: "Local comercial esquina Av. Las Águilas" },
   });
   if (existing) {
-    console.log("Demo property already exists → skip. id:", existing.id);
+    console.log("Demo property exists, updating:", existing.id);
+    await prisma.property.update({
+      where: { id: existing.id },
+      data: {
+        transactionType: "acquisition",
+        ticketNumber: "UVK-0001",
+        acquisitionStage: "analyzing",
+        propertyType: "local",
+        occupancyStatus: "rented",
+        currentTenant: "Kentucky Fried Chicken",
+        currentRent: 185000,
+        responsableInternoId: admin.id,
+        responsableExternoName: "Beto Bróker",
+        responsableExternoEmail: "broker@demo.uvikt.mx",
+        responsableExternoPhone: "+52 55 1234 5678",
+      },
+    });
+    await ensureCounterAndExtras(org.id, admin.id, broker.id);
+    console.log("✓ Updated demo property + extras.");
     return;
   }
 
@@ -74,7 +92,17 @@ async function main() {
       createdById: broker.id,
       inputMethod: "desktop_address",
       status: "report_ready",
-      transactionType: "sale",
+      transactionType: "acquisition",
+      ticketNumber: "UVK-0001",
+      acquisitionStage: "analyzing",
+      propertyType: "local",
+      occupancyStatus: "rented",
+      currentTenant: "Kentucky Fried Chicken",
+      currentRent: 185000,
+      responsableInternoId: admin.id,
+      responsableExternoName: "Beto Bróker",
+      responsableExternoEmail: "broker@demo.uvikt.mx",
+      responsableExternoPhone: "+52 55 1234 5678",
       title: "Local comercial esquina Av. Las Águilas",
       description:
         "Excelente local comercial sobre avenida principal, frente a plaza vecindaria con alto flujo vehicular y peatonal. Esquina con iluminación natural en dos frentes. Ideal para banco, farmacia o restaurante de marca.",
@@ -192,7 +220,9 @@ async function main() {
     },
   });
 
-  // Investor pipeline entry
+  await ensureCounterAndExtras(org.id, admin.id, broker.id);
+
+  // Investor pipeline entry (legacy)
   await prisma.investorPipelineEntry.create({
     data: { propertyId: property.id, stage: "reviewing", estimatedValue: 24500000, rtzRadiusMeters: 1500 },
   });
@@ -216,6 +246,48 @@ async function main() {
   console.log(`  Investor: investor@demo.uvikt.mx / demo12345`);
   console.log(`\n✓ Demo property: ${property.id}`);
   console.log(`  Public report: /r/${reportToken}`);
+}
+
+async function ensureCounterAndExtras(orgId: string, adminId: string, brokerId: string) {
+  await prisma.organizationCounter.upsert({
+    where: { organizationId: orgId },
+    create: { organizationId: orgId, lastTicketNum: 5 },
+    update: { lastTicketNum: 5 },
+  });
+
+  const extras: Array<{ ticket: string; title: string; type: string; stage: string; price: number; line1: string; nbhd: string; muni: string; cp: string; occupancy: string; tenant?: string; rent?: number; pot?: string }> = [
+    { ticket: "UVK-0002", title: "Terreno Polanco esquina", type: "terreno", stage: "authorized",  price: 48000000, line1: "Horacio 1234",         nbhd: "Polanco IV Sección", muni: "Miguel Hidalgo",     cp: "11560", occupancy: "vacant",  pot: "BBVA" },
+    { ticket: "UVK-0003", title: "Bodega industrial Vallejo", type: "bodega",  stage: "signing",     price: 62500000, line1: "Calle 33 #45",         nbhd: "Nueva Vallejo",      muni: "Gustavo A. Madero",  cp: "07750", occupancy: "rented",  tenant: "DHL", rent: 420000 },
+    { ticket: "UVK-0004", title: "Local Reforma Juárez",     type: "local",   stage: "signed",      price: 31200000, line1: "Paseo de la Reforma 200", nbhd: "Juárez",           muni: "Cuauhtémoc",         cp: "06600", occupancy: "rented",  tenant: "Starbucks", rent: 145000 },
+    { ticket: "UVK-0005", title: "Terreno Coyoacán",         type: "terreno", stage: "canceled",    price: 18500000, line1: "Av. Universidad 800",  nbhd: "Santa Catarina",     muni: "Coyoacán",           cp: "04010", occupancy: "vacant",  pot: "Oxxo" },
+  ];
+  for (const e of extras) {
+    const exists = await prisma.property.findFirst({ where: { organizationId: orgId, ticketNumber: e.ticket } });
+    if (exists) continue;
+    await prisma.property.create({
+      data: {
+        organizationId: orgId,
+        createdById: brokerId,
+        inputMethod: "manual",
+        transactionType: "acquisition",
+        ticketNumber: e.ticket,
+        acquisitionStage: e.stage,
+        propertyType: e.type,
+        title: e.title,
+        priceAmount: e.price,
+        priceCurrency: "MXN",
+        surfaceM2: Math.round(200 + Math.random() * 600),
+        occupancyStatus: e.occupancy,
+        currentTenant: e.tenant,
+        currentRent: e.rent,
+        potentialTenant: e.pot,
+        responsableInternoId: adminId,
+        responsableExternoName: "Beto Bróker",
+        status: "draft",
+        addresses: { create: { source: "user", isPrimary: true, line1: e.line1, neighborhood: e.nbhd, municipality: e.muni, state: "Ciudad de México", postalCode: e.cp, country: "MX" } },
+      },
+    });
+  }
 }
 
 // Duplicated tiny helpers to avoid importing server-only modules in seed script.

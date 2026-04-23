@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db";
 import { formatCurrency, formatNumber, radiusLabel, formatDate } from "@/lib/utils";
 import MapView from "@/components/MapView";
 import PropertyActions from "@/components/PropertyActions";
+import StageChanger from "@/components/StageChanger";
+import { ACQUISITION_STAGES } from "@/lib/stages";
 
 export default async function PropertyDetailPage({ params }: { params: { id: string } }) {
   const ctx = await requireContext();
@@ -26,6 +28,12 @@ export default async function PropertyDetailPage({ params }: { params: { id: str
   });
 
   if (!p) notFound();
+
+  const responsableInterno = p.responsableInternoId
+    ? await prisma.user.findUnique({ where: { id: p.responsableInternoId }, select: { name: true, email: true } })
+    : null;
+
+  const stageMeta = ACQUISITION_STAGES.find((s) => s.key === p.acquisitionStage) ?? ACQUISITION_STAGES[0];
 
   const hero = p.media.find((m) => m.kind === "hero") ?? p.media[0];
   const loc = p.locations.find((l) => l.kind === "corrected") ?? p.locations.find((l) => l.kind === "original") ?? p.locations[0];
@@ -49,9 +57,11 @@ export default async function PropertyDetailPage({ params }: { params: { id: str
 
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className={p.transactionType === "sale" ? "badge-info" : "badge-warning"}>{p.transactionType === "sale" ? "Venta" : "Renta"}</span>
-            <span className="badge-muted">{p.status}</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            {p.ticketNumber && <span className="badge-muted font-mono">#{p.ticketNumber}</span>}
+            <span className="badge" style={{ background: stageMeta.bg, color: stageMeta.color }}>{stageMeta.label}</span>
+            {p.propertyType && <span className="badge-info capitalize">{p.propertyType}</span>}
+            {p.occupancyStatus && <span className={p.occupancyStatus === "rented" ? "badge-warning" : "badge-success"}>{p.occupancyStatus === "rented" ? "Rentado" : "Vacío"}</span>}
             {p.landUse && <span className="badge-success">Uso: {p.landUse}</span>}
           </div>
           <h1 className="mt-2 text-2xl font-semibold">{p.title ?? "(sin título)"}</h1>
@@ -65,7 +75,12 @@ export default async function PropertyDetailPage({ params }: { params: { id: str
             <p className="mt-1 text-xs text-emerald-700">SEPOMEX: {validatedAddr.postalCode} · {validatedAddr.neighborhood}</p>
           )}
         </div>
-        <PropertyActions propertyId={p.id} status={p.status} />
+        <div className="flex flex-col gap-3 items-end min-w-[320px]">
+          <PropertyActions propertyId={p.id} status={p.status} />
+          <div className="card w-full p-4">
+            <StageChanger propertyId={p.id} current={p.acquisitionStage} />
+          </div>
+        </div>
       </header>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -89,19 +104,41 @@ export default async function PropertyDetailPage({ params }: { params: { id: str
           )}
 
           <section className="card">
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Ficha comercial</h2>
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Ficha del inmueble</h2>
             <div className="grid gap-4 md:grid-cols-3">
-              <Fact label="Precio" value={p.priceAmount ? formatCurrency(p.priceAmount, p.priceCurrency ?? "MXN") : "—"} />
+              <Fact label="Precio de venta" value={p.priceAmount ? formatCurrency(p.priceAmount, p.priceCurrency ?? "MXN") : "—"} />
               <Fact label="Superficie" value={p.surfaceM2 ? `${formatNumber(p.surfaceM2)} m²` : "—"} />
-              <Fact label="Frente × fondo" value={p.frontageM && p.depthM ? `${p.frontageM} × ${p.depthM} m` : "—"} />
-              <Fact label="Giro" value={p.propertyUse ?? "—"} />
-              <Fact label="Niveles" value={p.levels ?? "—"} />
-              <Fact label="Locales" value={p.localUnits ?? "—"} />
-              <Fact label="Esquina" value={p.isCorner ? "Sí" : "No"} />
+              <Fact label="Tipo" value={p.propertyType ?? "—"} />
+              <Fact label="Condición" value={p.occupancyStatus === "rented" ? "Rentado" : p.occupancyStatus === "vacant" ? "Vacío" : "—"} />
+              {p.occupancyStatus === "rented" && <Fact label="Inquilino actual" value={p.currentTenant ?? "—"} />}
+              {p.occupancyStatus === "rented" && <Fact label="Renta mensual" value={p.currentRent ? formatCurrency(p.currentRent) : "—"} />}
+              {p.occupancyStatus === "vacant" && <Fact label="Inquilino potencial" value={p.potentialTenant ?? "—"} />}
               <Fact label="Uso de suelo (SEDUVI)" value={p.landUse ?? "—"} />
-              <Fact label="Marcas notables" value={p.notableBrands ?? "—"} />
+              <Fact label="Frente × fondo" value={p.frontageM && p.depthM ? `${p.frontageM} × ${p.depthM} m` : "—"} />
+              <Fact label="Niveles" value={p.levels ?? "—"} />
             </div>
             {p.description && <p className="mt-4 whitespace-pre-line text-sm text-slate-700">{p.description}</p>}
+          </section>
+
+          <section className="card">
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">Responsables</h2>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Fact label="Interno" value={responsableInterno ? (responsableInterno.name ?? responsableInterno.email) : "—"} />
+              <Fact
+                label="Externo (broker)"
+                value={
+                  p.responsableExternoName
+                    ? (
+                      <>
+                        {p.responsableExternoName}
+                        {p.responsableExternoEmail && <><br/><span className="text-xs text-slate-500">{p.responsableExternoEmail}</span></>}
+                        {p.responsableExternoPhone && <><br/><span className="text-xs text-slate-500">{p.responsableExternoPhone}</span></>}
+                      </>
+                    )
+                    : "—"
+                }
+              />
+            </div>
           </section>
 
           {p.demographics.length > 0 && (
