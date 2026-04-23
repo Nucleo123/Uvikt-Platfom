@@ -165,9 +165,28 @@ export const inegiConnector: DemographicsConnector = {
 
       const pob = parseInt(row.pob, 10);
       const viv = parseInt(row.viv, 10);
-      const area = getMunicipioArea(match.cveGeo) ?? (getEstadoArea(match.cveEnt) ? getEstadoArea(match.cveEnt)! / 50 : 50);
-      const densidadHabKm2 = pob / area;
-      const densidadVivKm2 = viv / area;
+      const munArea = getMunicipioArea(match.cveGeo);
+      // If we don't have the specific municipio area, fall back to STATE density
+      // (state population / state area) which is a much more honest proxy than
+      // guessing a muni size.
+      let densidadHabKm2: number;
+      let densidadVivKm2: number;
+      let area: number;
+      let areaSource: "municipio" | "state_fallback";
+      if (munArea) {
+        area = munArea;
+        densidadHabKm2 = pob / munArea;
+        densidadVivKm2 = viv / munArea;
+        areaSource = "municipio";
+      } else {
+        const estadoArea = getEstadoArea(match.cveEnt) ?? 50000;
+        const estadoRow = (await loadEstados()).find((e) => e.cve_agee === match.cveEnt);
+        const estadoPob = estadoRow ? parseInt(estadoRow.pob, 10) : pob * 100;
+        densidadHabKm2 = estadoPob / estadoArea;
+        densidadVivKm2 = densidadHabKm2 / 3.4; // avg household size MX ~3.4
+        area = pob / densidadHabKm2; // implied muni area
+        areaSource = "state_fallback";
+      }
 
       const nse = CDMX_NSE[match.cveGeo] ?? nseFromDensity(densidadHabKm2);
       const avgHousehold = pob / Math.max(1, viv);
@@ -199,9 +218,9 @@ export const inegiConnector: DemographicsConnector = {
         fetchedAt: now,
         raw: {
           coords, radiiMeters,
-          method: "inegi_wscatgeo_municipio + area_scaling",
+          method: areaSource === "municipio" ? "inegi_wscatgeo_municipio + muni_area" : "inegi_wscatgeo_municipio + state_density_fallback",
           match,
-          municipio: { cvegeo: row.cvegeo, nom: row.nom_agem, pob, viv, areaKm2: area, densidadHabKm2 },
+          municipio: { cvegeo: row.cvegeo, nom: row.nom_agem, pob, viv, areaKm2: area, densidadHabKm2, areaSource },
           nseSource: CDMX_NSE[match.cveGeo] ? "CONAPO/AMAI table" : "density heuristic",
         },
         normalized: { bands },

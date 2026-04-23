@@ -164,6 +164,39 @@ model OrganizationCounter {
   updatedAt      DateTime @updatedAt
 }
 
+// Tokenized public link for the "Ficha de Mercado" one-pager.
+model MarketSheetShare {
+  id             String    @id @default(cuid())
+  propertyId     String
+  organizationId String
+  shareToken     String    @unique
+  radiusMeters   Int       @default(1000)
+  shareExpiresAt DateTime?
+  snapshotJson   String    // frozen market-sheet snapshot
+  viewsCount     Int       @default(0)
+  createdById    String?
+  createdAt      DateTime  @default(now())
+
+  @@index([propertyId])
+  @@index([organizationId])
+}
+
+// Email invitations to join an organization. No email service required:
+// admin creates invitation, gets a link, shares it manually.
+model Invitation {
+  id             String    @id @default(cuid())
+  organizationId String
+  email          String
+  role           String    // 'admin' | 'broker' | 'investor'
+  token          String    @unique
+  invitedById    String?
+  acceptedAt     DateTime?
+  expiresAt      DateTime
+  createdAt      DateTime  @default(now())
+
+  @@index([organizationId, email])
+}
+
 // Raw ingestion payload (photo upload payload / typed-address payload)
 model PropertyInput {
   id          String   @id @default(cuid())

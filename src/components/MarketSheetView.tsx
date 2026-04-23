@@ -53,6 +53,21 @@ export default function MarketSheetView({ propertyId }: { propertyId: string }) 
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [share, setShare] = useState<{ shareUrl: string; pdfUrl: string } | null>(null);
+
+  async function generateShare() {
+    setSharing(true);
+    const res = await fetch(`/api/properties/${propertyId}/market-sheet/share`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ radiusMeters: radius, expiresInDays: 30 }),
+    });
+    setSharing(false);
+    if (res.ok) {
+      const data = await res.json();
+      setShare({ shareUrl: data.shareUrl, pdfUrl: data.pdfUrl });
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -86,9 +101,20 @@ export default function MarketSheetView({ propertyId }: { propertyId: string }) 
               <option value={5000}>5 km</option>
             </select>
           </label>
-          <button onClick={() => window.print()} className="btn-secondary">Imprimir / PDF</button>
+          <button onClick={() => window.print()} className="btn-secondary">🖨 Imprimir</button>
+          <button onClick={generateShare} disabled={sharing} className="btn-primary">{sharing ? "Generando…" : "🔗 Compartir link"}</button>
         </div>
       </nav>
+      {share && (
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
+          <div className="font-medium text-emerald-800">✓ Link público generado (expira en 30 días)</div>
+          <div className="mt-1 flex flex-wrap gap-2 text-xs">
+            <a href={share.shareUrl} target="_blank" rel="noreferrer" className="rounded bg-white px-2 py-1 font-mono text-emerald-900 underline">{share.shareUrl}</a>
+            <a href={share.pdfUrl} target="_blank" rel="noreferrer" className="rounded bg-white px-2 py-1 underline">📄 PDF</a>
+            <button onClick={() => navigator.clipboard.writeText(share.shareUrl)} className="rounded bg-white px-2 py-1 underline">Copiar</button>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-2xl bg-white shadow-card overflow-hidden print:shadow-none">
         {/* HEADER */}

@@ -3,6 +3,7 @@ import { requireContext } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ACQUISITION_STAGES } from "@/lib/stages";
+import OnboardingTour from "@/components/OnboardingTour";
 
 export default async function DashboardPage() {
   const ctx = await requireContext();
@@ -30,6 +31,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-8">
+      <OnboardingTour userName={ctx.user.name ?? ctx.user.email} />
       <header className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Dashboard</h1>

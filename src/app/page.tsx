@@ -26,7 +26,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-5xl gap-6 px-8 pb-24 md:grid-cols-4">
+      <section className="mx-auto grid max-w-5xl gap-6 px-8 pb-12 md:grid-cols-4">
         {[
           { n: "1", t: "DISPARA", d: "Captura desde móvil con geofoto, o dirección desde escritorio." },
           { n: "2", t: "VALIDA",  d: "Confirmación SEPOMEX + uso de suelo SEDUVI + demografía INEGI." },
@@ -40,6 +40,13 @@ export default function Landing() {
           </div>
         ))}
       </section>
+
+      <footer className="border-t border-white/10 px-8 py-6 text-center text-xs text-white/40">
+        © {new Date().getFullYear()} UVIKT ·{" "}
+        <Link href="/terms" className="hover:text-white/70 hover:underline">Términos</Link>
+        {" · "}
+        <Link href="/privacy" className="hover:text-white/70 hover:underline">Aviso de Privacidad</Link>
+      </footer>
     </main>
   );
 }

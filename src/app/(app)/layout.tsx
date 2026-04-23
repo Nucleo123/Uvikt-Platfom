@@ -33,6 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           {can(role, "admin.branding") && <NavLink href="/admin/branding" label="Branding" />}
           {can(role, "admin.sources")  && <NavLink href="/admin/sources" label="Fuentes de datos" />}
           {can(role, "admin.users")    && <NavLink href="/admin/users" label="Usuarios" />}
+          {can(role, "admin.users")    && <NavLink href="/admin/audit" label="Actividad" />}
           {can(role, "admin.market")   && <NavLink href="/admin/market" label="Mercado" />}
         </nav>
 
