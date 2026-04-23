@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
 
   const user = await prisma.user.findUnique({
-    where: { email: parsed.data.email.toLowerCase() },
+    where: { email: parsed.data.email.trim().toLowerCase() },
     include: { memberships: { orderBy: { createdAt: "asc" } } },
   });
   if (!user) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });

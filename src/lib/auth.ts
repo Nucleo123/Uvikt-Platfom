@@ -9,14 +9,18 @@ export type SessionData = {
   activeOrgId?: string;
 };
 
+const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14; // 14 days
+
 const sessionOptions: SessionOptions = {
   password: process.env.AUTH_SECRET || "change-me-change-me-change-me-change-me",
   cookieName: "uvikt_session",
+  ttl: SESSION_TTL_SECONDS,
   cookieOptions: {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
+    maxAge: SESSION_TTL_SECONDS,
   },
 };
 

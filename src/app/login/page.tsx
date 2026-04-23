@@ -5,8 +5,8 @@ import { useState } from "react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("broker@demo.uvikt.mx");
-  const [password, setPassword] = useState("demo12345");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -15,7 +15,7 @@ export default function LoginPage() {
     setBusy(true); setErr(null);
     const res = await fetch("/api/auth/login", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
     });
     setBusy(false);
     if (!res.ok) {
@@ -45,13 +45,16 @@ export default function LoginPage() {
       <section className="flex items-center justify-center p-8">
         <form onSubmit={onSubmit} className="w-full max-w-sm">
           <h1 className="mb-1 text-2xl font-semibold">Ingresar</h1>
-          <p className="mb-6 text-sm text-slate-500">Demo: broker@demo.uvikt.mx · demo12345</p>
+          <p className="mb-6 text-sm text-slate-500">Accede a tu plataforma de adquisiciones inmobiliarias.</p>
 
           <label className="label">Email</label>
-          <input className="input mb-4" value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
+          <input className="input mb-4" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" required placeholder="tu@empresa.com" />
 
-          <label className="label">Contraseña</label>
-          <input className="input mb-6" value={password} onChange={(e) => setPassword(e.target.value)} type="password" required />
+          <div className="mb-1 flex items-center justify-between">
+            <label className="label mb-0">Contraseña</label>
+            <Link href="/forgot-password" className="text-xs text-ink hover:underline">¿Olvidaste tu contraseña?</Link>
+          </div>
+          <input className="input mb-6" value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="current-password" required />
 
           {err && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{err}</div>}
 
