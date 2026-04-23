@@ -30,8 +30,18 @@ type Sheet = {
     byCategory: Record<string, { count: number; brands: string[] }>;
   } | null;
   sources: {
-    inegi: { status: string; confidence?: number; error?: string };
-    commercial: { status: string; confidence?: number; error?: string };
+    inegi: {
+      status: string;
+      confidence?: number;
+      error?: string;
+      municipality?: string;
+      state?: string;
+      municipioPopulation?: number;
+      municipioAreaKm2?: number;
+      densityHabKm2?: number;
+      method?: string;
+    };
+    commercial: { status: string; confidence?: number; error?: string; provider?: string };
   };
   branding: { companyName: string; logoUrl: string | null; primaryColor: string; accentColor: string };
   photoUrl: string | null;
@@ -149,6 +159,14 @@ export default function MarketSheetView({ propertyId }: { propertyId: string }) 
               <h3 className="text-xs uppercase tracking-widest text-slate-500">Demografía INEGI · {radiusLabel(radius)}</h3>
               <SourceDot status={sheet.sources.inegi.status} />
             </div>
+            {sheet.sources.inegi.municipality && (
+              <div className="mb-3 rounded-lg bg-slate-50 p-2 text-[11px] text-slate-600">
+                📍 <b>{sheet.sources.inegi.municipality}</b>, {sheet.sources.inegi.state} ·{" "}
+                población municipal {sheet.sources.inegi.municipioPopulation?.toLocaleString()} · densidad{" "}
+                {sheet.sources.inegi.densityHabKm2 ? Math.round(sheet.sources.inegi.densityHabKm2).toLocaleString() : "—"} hab/km²
+                <div className="mt-1 text-[10px] text-slate-400">Fuente: INEGI Censo 2020 (wscatgeo) — estimación por radio vía densidad municipal</div>
+              </div>
+            )}
             {sheet.demographics ? (
               <div>
                 <div className="flex items-baseline gap-3">

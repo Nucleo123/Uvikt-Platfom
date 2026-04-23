@@ -49,6 +49,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     commercialConnector.fetchCommercialContext({ lat: loc.lat, lng: loc.lng }, [radius]),
   ]);
 
+  // Extract municipality metadata from INEGI raw payload for display
+  const inegiMatch = (demo.raw as { match?: { nomMunicipio?: string; nomEstado?: string; cveGeo?: string }; municipio?: { pob?: number; areaKm2?: number; densidadHabKm2?: number }; method?: string } | undefined);
+
   return NextResponse.json({
     propertyId: p.id,
     ticketNumber: p.ticketNumber,
@@ -72,8 +75,23 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     demographics: demo.normalized.bands[0] ?? null,
     commercial: commercial.normalized.bands[0] ?? null,
     sources: {
-      inegi: { status: demo.status, confidence: demo.confidence, error: demo.error },
-      commercial: { status: commercial.status, confidence: commercial.confidence, error: commercial.error },
+      inegi: {
+        status: demo.status,
+        confidence: demo.confidence,
+        error: demo.error,
+        municipality: inegiMatch?.match?.nomMunicipio,
+        state: inegiMatch?.match?.nomEstado,
+        municipioPopulation: inegiMatch?.municipio?.pob,
+        municipioAreaKm2: inegiMatch?.municipio?.areaKm2,
+        densityHabKm2: inegiMatch?.municipio?.densidadHabKm2,
+        method: inegiMatch?.method ?? "fallback",
+      },
+      commercial: {
+        status: commercial.status,
+        confidence: commercial.confidence,
+        error: commercial.error,
+        provider: (commercial.raw as { provider?: string } | undefined)?.provider,
+      },
     },
     branding: {
       companyName: p.organization.brandingProfile?.companyName ?? p.organization.name,

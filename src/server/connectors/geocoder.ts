@@ -39,7 +39,9 @@ export async function reverseGeocode(lat: number, lng: number): Promise<Validate
     return {
       line1: [a.road, a.house_number].filter(Boolean).join(" ") || (data.display_name ?? ""),
       neighborhood: a.neighbourhood || a.suburb,
-      municipality: a.city || a.town || a.municipality,
+      // For CDMX + similar, `borough` carries the alcaldía/municipio name; `city` is "Ciudad de México".
+      // Prefer borough/municipality over city to avoid conflating city==muni.
+      municipality: a.borough || a.municipality || a.city_district || a.county || a.city || a.town,
       state: a.state,
       postalCode: a.postcode || "",
       country: "MX",
