@@ -32,9 +32,10 @@ export default function PropertyActions({ propertyId, status }: { propertyId: st
 
   return (
     <div className="flex flex-col items-end gap-2">
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap justify-end">
+        <a href={`/properties/${propertyId}/ficha-mercado`} className="btn-secondary">📊 Ficha de mercado</a>
         <button disabled={!!busy} onClick={enrich} className="btn-secondary">{busy === "enrich" ? "Enriqueciendo…" : "Re-enriquecer"}</button>
-        <button disabled={!!busy} onClick={generate} className="btn-primary">{busy === "report" ? "Generando…" : "Generar reporte"}</button>
+        <button disabled={!!busy} onClick={generate} className="btn-primary">{busy === "report" ? "Generando…" : "Reporte comercial"}</button>
       </div>
       {share && (
         <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600 shadow-card">

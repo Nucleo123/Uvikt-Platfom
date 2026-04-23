@@ -23,7 +23,21 @@ type Form = {
   currentRent: string;
   potentialTenant: string;
   photo: { url: string; storageKey: string } | null;
-  seduviFicha: { url: string; storageKey: string } | null;
+  seduviFicha: {
+    url: string;
+    storageKey: string;
+    extracted?: {
+      cuentaCatastral?: string;
+      usoSueloCodigo?: string;
+      usoSueloTexto?: string;
+      superficiePredioM2?: number;
+      frenteM?: number;
+      colonia?: string;
+      alcaldia?: string;
+      codigoPostal?: string;
+    } | null;
+    parseError?: string | null;
+  } | null;
   kmz: { url: string; storageKey: string; polygonGeoJson?: string | null; centroid?: { lat: number; lng: number } | null } | null;
 };
 
@@ -58,12 +72,19 @@ export default function AcquisitionWizard({ members }: { members: OrgMember[] })
   async function upload(file: File, kind: "photo" | "seduvi" | "kmz") {
     const body = new FormData();
     body.append("file", file);
-    const endpoint = kind === "kmz" ? "/api/upload/kmz" : "/api/upload";
+    const endpoint = kind === "kmz" ? "/api/upload/kmz" : kind === "seduvi" ? "/api/upload/seduvi" : "/api/upload";
     const res = await fetch(endpoint, { method: "POST", body });
     if (!res.ok) { setErr("Error al subir archivo"); return; }
     const data = await res.json();
     if (kind === "photo") set("photo", { url: data.url, storageKey: data.key });
-    if (kind === "seduvi") set("seduviFicha", { url: data.url, storageKey: data.key });
+    if (kind === "seduvi") {
+      set("seduviFicha", { url: data.url, storageKey: data.key, extracted: data.extracted, parseError: data.parseError });
+      // Auto-fill surface + postal code from parsed SEDUVI data if broker hasn't filled them
+      if (data.extracted?.superficiePredioM2 && !form.surfaceM2) set("surfaceM2", String(data.extracted.superficiePredioM2));
+      if (data.extracted?.codigoPostal && !form.address.postalCode) set("address", { ...form.address, postalCode: data.extracted.codigoPostal });
+      if (data.extracted?.colonia && !form.address.neighborhood) set("address", { ...form.address, neighborhood: data.extracted.colonia });
+      if (data.extracted?.alcaldia && !form.address.municipality) set("address", { ...form.address, municipality: data.extracted.alcaldia });
+    }
     if (kind === "kmz") {
       set("kmz", { url: data.url, storageKey: data.key, polygonGeoJson: data.polygonGeoJson, centroid: data.centroid });
       if (data.centroid && !form.location) set("location", data.centroid);
@@ -96,6 +117,7 @@ export default function AcquisitionWizard({ members }: { members: OrgMember[] })
         photoUrl: form.photo?.url,
         photoStorageKey: form.photo?.storageKey,
         seduviFichaUploadedUrl: form.seduviFicha?.url,
+        seduviExtracted: form.seduviFicha?.extracted ?? undefined,
         kmzUploadedUrl: form.kmz?.url,
         kmzPolygonGeoJson: form.kmz?.polygonGeoJson ?? undefined,
         responsableInternoId: form.responsableInternoId || undefined,
@@ -225,7 +247,23 @@ export default function AcquisitionWizard({ members }: { members: OrgMember[] })
             <div>
               <label className="label">Ficha SEDUVI (PDF de uso de suelo)</label>
               <input type="file" accept="application/pdf" onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f, "seduvi"); }} className="input" />
-              {form.seduviFicha && <div className="mt-1 text-xs text-emerald-700">✓ Ficha cargada</div>}
+              {form.seduviFicha && (
+                <div className="mt-2 rounded-lg bg-emerald-50 p-3 text-xs">
+                  <div className="font-semibold text-emerald-800">✓ Ficha SEDUVI procesada</div>
+                  {form.seduviFicha.extracted ? (
+                    <div className="mt-1 grid grid-cols-2 gap-1 text-emerald-900">
+                      {form.seduviFicha.extracted.cuentaCatastral && <div><b>Cuenta catastral:</b> {form.seduviFicha.extracted.cuentaCatastral}</div>}
+                      {form.seduviFicha.extracted.usoSueloCodigo && <div><b>Uso de suelo:</b> {form.seduviFicha.extracted.usoSueloCodigo}</div>}
+                      {form.seduviFicha.extracted.superficiePredioM2 && <div><b>Superficie:</b> {form.seduviFicha.extracted.superficiePredioM2} m²</div>}
+                      {form.seduviFicha.extracted.frenteM && <div><b>Frente:</b> {form.seduviFicha.extracted.frenteM} m</div>}
+                      {form.seduviFicha.extracted.colonia && <div><b>Colonia:</b> {form.seduviFicha.extracted.colonia}</div>}
+                      {form.seduviFicha.extracted.codigoPostal && <div><b>CP:</b> {form.seduviFicha.extracted.codigoPostal}</div>}
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-amber-700">PDF guardado, pero no se pudo extraer información estructurada. {form.seduviFicha.parseError ? `(${form.seduviFicha.parseError})` : ""}</div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>

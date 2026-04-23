@@ -53,6 +53,16 @@ export type CreatePropertyInput = {
 
   // Pre-uploaded documents
   seduviFichaUploadedUrl?: string;
+  seduviExtracted?: {
+    cuentaCatastral?: string;
+    usoSueloCodigo?: string;
+    usoSueloTexto?: string;
+    superficiePredioM2?: number;
+    frenteM?: number;
+    colonia?: string;
+    alcaldia?: string;
+    codigoPostal?: string;
+  };
   kmzUploadedUrl?: string;
   kmzPolygonGeoJson?: string;
 };
@@ -78,12 +88,13 @@ export async function createProperty(input: CreatePropertyInput) {
       responsableExternoEmail: input.responsableExternoEmail,
       responsableExternoPhone: input.responsableExternoPhone,
       polygonGeoJson: input.kmzPolygonGeoJson,
+      landUse: input.seduviExtracted?.usoSueloCodigo,
       title: input.title,
       description: input.description,
       priceAmount: input.priceAmount,
       priceCurrency: input.priceCurrency ?? "MXN",
-      surfaceM2: input.surfaceM2,
-      frontageM: input.frontageM,
+      surfaceM2: input.surfaceM2 ?? input.seduviExtracted?.superficiePredioM2,
+      frontageM: input.frontageM ?? input.seduviExtracted?.frenteM,
       depthM: input.depthM,
       propertyUse: input.propertyUse,
       isCorner: input.isCorner ?? false,

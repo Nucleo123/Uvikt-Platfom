@@ -20,6 +20,16 @@ const createSchema = z.object({
   responsableExternoEmail: z.string().email().optional(),
   responsableExternoPhone: z.string().optional(),
   seduviFichaUploadedUrl: z.string().url().optional(),
+  seduviExtracted: z.object({
+    cuentaCatastral: z.string().optional(),
+    usoSueloCodigo: z.string().optional(),
+    usoSueloTexto: z.string().optional(),
+    superficiePredioM2: z.number().optional(),
+    frenteM: z.number().optional(),
+    colonia: z.string().optional(),
+    alcaldia: z.string().optional(),
+    codigoPostal: z.string().optional(),
+  }).optional(),
   kmzUploadedUrl: z.string().url().optional(),
   kmzPolygonGeoJson: z.string().optional(),
 
