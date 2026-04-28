@@ -23,7 +23,7 @@ export default function LoginPage() {
       setErr(data.error ?? "Error al iniciar sesión");
       return;
     }
-    router.push("/dashboard");
+    router.push("/en-proceso");
     router.refresh();
   }
 
