@@ -24,7 +24,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
         </p>
         <div className="flex items-center justify-center gap-3">
           <button onClick={reset} className="btn-primary">Reintentar</button>
-          <Link href="/dashboard" className="btn-secondary">Ir al dashboard</Link>
+          <Link href="/en-proceso" className="btn-secondary">Ir al inicio</Link>
         </div>
       </div>
     </div>

@@ -10,20 +10,21 @@ type Role = "admin" | "broker" | "investor";
 
 type Item = { href: string; label: string; roles?: Role[] };
 
-const NAV: Item[] = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/adquisiciones", label: "Adquisiciones" },
-  { href: "/properties", label: "Inmuebles" },
-  { href: "/properties/new", label: "Nuevo inmueble" },
-  { href: "/pipeline", label: "Pipeline inversionista", roles: ["admin", "investor"] },
+const PRIMARY: Item[] = [
+  { href: "/en-proceso",         label: "En proceso" },
+  { href: "/estudio-de-mercado", label: "Estudio de mercado" },
+  { href: "/mi-ficha",           label: "Mi ficha",            roles: ["admin", "broker"] },
+];
+
+const INVESTOR: Item[] = [
+  { href: "/pipeline", label: "Pipeline inversionista", roles: ["investor"] },
 ];
 
 const ADMIN: Item[] = [
-  { href: "/admin/branding", label: "Branding", roles: ["admin"] },
-  { href: "/admin/sources",  label: "Fuentes de datos", roles: ["admin"] },
-  { href: "/admin/users",    label: "Usuarios", roles: ["admin"] },
-  { href: "/admin/audit",    label: "Actividad", roles: ["admin"] },
-  { href: "/admin/market",   label: "Mercado", roles: ["admin"] },
+  { href: "/admin/users",   label: "Usuarios",        roles: ["admin"] },
+  { href: "/admin/audit",   label: "Actividad",       roles: ["admin"] },
+  { href: "/admin/sources", label: "Fuentes de datos", roles: ["admin"] },
+  { href: "/admin/market",  label: "Mercado",         roles: ["admin"] },
 ];
 
 export default function AppShell({
@@ -42,12 +43,13 @@ export default function AppShell({
   const pathname = usePathname();
   const [drawer, setDrawer] = useState(false);
 
-  const visible = NAV.filter((i) => !i.roles || i.roles.includes(role));
+  const primary = PRIMARY.filter((i) => !i.roles || i.roles.includes(role));
+  const investor = INVESTOR.filter((i) => !i.roles || i.roles.includes(role));
   const admin = ADMIN.filter((i) => !i.roles || i.roles.includes(role));
 
   const navBody = (
     <>
-      <Link href="/dashboard" onClick={() => setDrawer(false)} className="mb-8 flex items-center gap-2 font-semibold">
+      <Link href="/en-proceso" onClick={() => setDrawer(false)} className="mb-6 flex items-center gap-2 font-semibold">
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: branding.primaryColor }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <path d="M12 2a7 7 0 017 7c0 4.5-7 13-7 13S5 13.5 5 9a7 7 0 017-7z" fill={branding.accentColor} />
@@ -56,12 +58,36 @@ export default function AppShell({
         UVIKT
       </Link>
 
+      <Link
+        href="/properties/new"
+        onClick={() => setDrawer(false)}
+        className="mb-5 flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+        style={{ background: branding.primaryColor }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>
+        Nuevo inmueble
+      </Link>
+
       <nav className="flex flex-1 flex-col gap-1 text-sm">
-        {visible.map((i) => <NavLink key={i.href} item={i} active={pathname === i.href || (i.href !== "/dashboard" && pathname.startsWith(i.href))} onNav={() => setDrawer(false)} />)}
+        {primary.map((i) => (
+          <NavLink key={i.href} item={i} active={isActive(pathname, i.href)} onNav={() => setDrawer(false)} />
+        ))}
+
+        {investor.length > 0 && (
+          <>
+            <div className="mt-4 text-[10px] uppercase tracking-widest text-slate-400">Inversionista</div>
+            {investor.map((i) => (
+              <NavLink key={i.href} item={i} active={isActive(pathname, i.href)} onNav={() => setDrawer(false)} />
+            ))}
+          </>
+        )}
+
         {admin.length > 0 && (
           <>
             <div className="mt-4 text-[10px] uppercase tracking-widest text-slate-400">Admin</div>
-            {admin.map((i) => <NavLink key={i.href} item={i} active={pathname.startsWith(i.href)} onNav={() => setDrawer(false)} />)}
+            {admin.map((i) => (
+              <NavLink key={i.href} item={i} active={isActive(pathname, i.href)} onNav={() => setDrawer(false)} />
+            ))}
           </>
         )}
       </nav>
@@ -82,7 +108,7 @@ export default function AppShell({
         <button onClick={() => setDrawer(true)} aria-label="Abrir menú" className="rounded-lg p-2 hover:bg-slate-100">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
         </button>
-        <Link href="/dashboard" className="font-semibold">UVIKT</Link>
+        <Link href="/en-proceso" className="font-semibold">UVIKT</Link>
         <div className="w-9" />
       </div>
 
@@ -102,6 +128,13 @@ export default function AppShell({
       <main className="md:pl-60">{children}</main>
     </div>
   );
+}
+
+function isActive(pathname: string, href: string) {
+  if (pathname === href) return true;
+  // Treat /mi-ficha and /admin/branding as the same active item
+  if (href === "/mi-ficha" && pathname.startsWith("/admin/branding")) return true;
+  return pathname.startsWith(href + "/");
 }
 
 function NavLink({ item, active, onNav }: { item: Item; active: boolean; onNav: () => void }) {
