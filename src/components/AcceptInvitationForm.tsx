@@ -22,7 +22,7 @@ export default function AcceptInvitationForm({ token, email, isExistingUser }: {
       setErr(data.error ?? "Error");
       return;
     }
-    router.push("/en-proceso");
+    router.push("/dashboard");
     router.refresh();
   }
 

@@ -24,7 +24,7 @@ export default function RegisterPage() {
       setErr(data.error ?? "Error en el registro");
       return;
     }
-    router.push("/en-proceso");
+    router.push("/dashboard");
     router.refresh();
   }
 

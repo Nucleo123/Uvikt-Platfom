@@ -51,7 +51,7 @@ export default async function PropertyDetailPage({ params }: { params: { id: str
   return (
     <div className="p-8">
       <nav className="mb-4 text-sm text-slate-500">
-        <Link href="/en-proceso" className="hover:underline">En proceso</Link> <span className="mx-2">/</span>
+        <Link href="/properties" className="hover:underline">Propiedades</Link> <span className="mx-2">/</span>
         <span className="text-slate-700">{p.title ?? primaryAddr?.line1 ?? p.id}</span>
       </nav>
 

@@ -23,7 +23,7 @@ export default function ResetPasswordForm({ token }: { token: string }) {
       setErr(data.error ?? "Error");
       return;
     }
-    router.push("/en-proceso");
+    router.push("/dashboard");
     router.refresh();
   }
 

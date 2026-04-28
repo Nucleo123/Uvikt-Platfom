@@ -9,7 +9,7 @@ export default function NotFound() {
         <h1 className="mb-3 text-xl font-semibold text-ink">No encontramos esto</h1>
         <p className="mb-6 text-sm text-slate-600">El enlace puede estar roto o el recurso fue movido.</p>
         <div className="flex items-center justify-center gap-3">
-          <Link href="/en-proceso" className="btn-primary">Ir al inicio</Link>
+          <Link href="/dashboard" className="btn-primary">Ir al dashboard</Link>
           <Link href="/" className="btn-secondary">Inicio</Link>
         </div>
       </div>

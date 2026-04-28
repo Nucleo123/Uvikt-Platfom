@@ -26,7 +26,6 @@ const MATRIX: Record<Role, Action[]> = {
   broker: [
     "property.read", "property.create", "property.update",
     "property.enrich", "report.generate", "report.share",
-    "admin.branding",
   ],
   investor: [
     "property.read", "property.create",

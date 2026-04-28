@@ -19,7 +19,7 @@ const STEPS = [
   {
     title: "2. Controla el pipeline con semáforos",
     body: "Cada inmueble arranca en 'Analizando'. Lo mueves entre Autorizado / Cancelado / En firma / Firmado en la pantalla del inmueble o desde el tablero Kanban.",
-    cta: { href: "/en-proceso?view=kanban", label: "Ver semáforos" },
+    cta: { href: "/adquisiciones", label: "Ver pipeline" },
   },
   {
     title: "3. Genera ficha de mercado",
